@@ -1,4 +1,6 @@
 line-length = 130
 
 [lint]
+# Regras fixas (nucleo): nao mudam quando o ruff atualiza o conjunto padrao
+select = ["E4", "E9", "F"]
 ignore = ["B008", "SIM117", "B017"]
