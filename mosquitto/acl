@@ -1,0 +1,14 @@
+# ACL do broker (Iteração 2). Gerada para a cópia segura em /mosquitto/acl pelo docker-compose.
+
+# Serviços internos (API, ingestão, ensaios de carga): acesso total.
+user dsm
+topic readwrite #
+
+# Nó sensor simulado: só publica a contagem e o próprio status (inclui a mensagem de última vontade).
+user totem
+topic write dsm/+/totem/sensor/+
+topic readwrite dsm/+/totem/status/+
+
+# Assinante de demonstração: só leitura. Tentar publicar é negado.
+user leitor
+topic read dsm/#

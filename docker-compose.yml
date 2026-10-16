@@ -1,0 +1,84 @@
+# Sobe todo o ambiente com um único comando:  docker compose up --build
+x-app-env: &app-env
+  MQTT_HOST: mosquitto
+  MQTT_USER: ${MQTT_USER:-dsm}
+  MQTT_PASS: ${MQTT_PASS:-dsm_pass}
+  DATABASE_URL: postgresql://dsm:${POSTGRES_PASSWORD:-dsm}@db:5432/dsm
+  JWT_SECRET: ${JWT_SECRET:-trocar-esta-chave-em-producao-0123456789}
+  ADMIN_USER: ${ADMIN_USER:-admin}
+  ADMIN_PASS: ${ADMIN_PASS:-admin123}
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    environment:
+      MQTT_USER: "${MQTT_USER:-dsm}"
+      MQTT_PASS: "${MQTT_PASS:-dsm_pass}"
+      TOTEM_PASS: "${TOTEM_PASS:-totem_pass}"
+      LEITOR_PASS: "${LEITOR_PASS:-leitor_pass}"
+    # gera senhas e ACL a partir das variáveis de ambiente (nada de segredo no repositório)
+    command: >
+      sh -c 'mosquitto_passwd -b -c /mosquitto/passwd "$$MQTT_USER" "$$MQTT_PASS" &&
+             mosquitto_passwd -b /mosquitto/passwd totem "$$TOTEM_PASS" &&
+             mosquitto_passwd -b /mosquitto/passwd leitor "$$LEITOR_PASS" &&
+             cp /mosquitto/config/acl /mosquitto/acl &&
+             chown mosquitto:mosquitto /mosquitto/passwd /mosquitto/acl && chmod 600 /mosquitto/passwd /mosquitto/acl &&
+             exec mosquitto -c /mosquitto/config/mosquitto.conf'
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - mqtt-data:/mosquitto/data
+    ports: ["1883:1883", "9001:9001"]
+
+  db:
+    image: timescale/timescaledb:2.17.2-pg16
+    shm_size: "1gb"
+    environment:
+      POSTGRES_USER: dsm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dsm}
+      POSTGRES_DB: dsm
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dsm -d dsm"]
+      interval: 5s
+      retries: 20
+
+  ingest:            # escalável:  docker compose up --scale ingest=3
+    build: ./backend
+    command: python -m app.ingest
+    environment: *app-env
+    depends_on: { db: { condition: service_healthy }, mosquitto: { condition: service_started } }
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    environment: *app-env
+    volumes: ["./web:/srv/web:ro", "./simulador-web:/srv/simulador:ro"]
+    ports: ["8000:8000"]
+    depends_on: { db: { condition: service_healthy }, mosquitto: { condition: service_started } }
+    restart: unless-stopped
+
+  totem:             # nó sensor simulado (contagem de visitantes no estande)
+    build: ./backend
+    command: python -m app.simulator totem --intervalo 3
+    environment:
+      <<: *app-env
+      MQTT_USER: totem                     # usuário com permissão restrita pela ACL
+      MQTT_PASS: ${TOTEM_PASS:-totem_pass}
+    depends_on: [mosquitto]
+    restart: unless-stopped
+
+  proxy:             # TLS opcional (RNF12):  docker compose --profile tls up -d   ->  https://localhost:8443
+    profiles: ["tls"]
+    image: caddy:2.8-alpine
+    volumes: ["./proxy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data"]
+    ports: ["8443:8443"]
+    depends_on: [api]
+
+volumes:
+  db-data:
+  mqtt-data:
+  caddy-data:

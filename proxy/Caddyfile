@@ -1,0 +1,10 @@
+# RNF12: canal cifrado para o acesso administrativo. Ative com:  docker compose --profile tls up -d
+# O Caddy gera um certificado local; o navegador mostra um aviso na primeira vez (aceite para continuar).
+{
+	auto_https disable_redirects
+}
+
+localhost:8443 {
+	tls internal
+	reverse_proxy api:8000
+}

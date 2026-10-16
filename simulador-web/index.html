@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DSM Conecta — Totem simulado (navegador)</title>
+<style>
+  :root { --fg:#1b1b1b; --bg:#fafafa; --card:#fff; --acc:#8e0000; --ok:#1b5e20; --bad:#b00020; }
+  body { font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg); margin:0; padding:16px; }
+  main { max-width:720px; margin:auto; }
+  .card { background:var(--card); border:1px solid #ddd; border-radius:12px; padding:16px; margin-bottom:12px; }
+  h1 { font-size:1.3rem; margin:0 0 4px; } h2 { font-size:1rem; margin:0 0 8px; }
+  label { display:block; font-size:.9rem; margin-top:8px; }
+  input { width:100%; box-sizing:border-box; padding:8px; font-size:1rem; border:1px solid #888; border-radius:6px; }
+  button { padding:10px 16px; font-size:1rem; border:0; border-radius:8px; background:var(--acc); color:#fff; cursor:pointer; margin:8px 8px 0 0; }
+  button:disabled { background:#777; cursor:not-allowed; }
+  #estado { font-weight:700; } .on { color:var(--ok); } .off { color:var(--bad); }
+  #contador { font-size:3rem; font-weight:700; }
+  #log { font-family:ui-monospace,monospace; font-size:.8rem; background:#111; color:#9f9; padding:8px; border-radius:6px; height:180px; overflow:auto; white-space:pre-wrap; }
+  .desc { color:#444; font-size:.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>Totem simulado do estande (nó sensor)</h1>
+    <p class="desc">Simula o microcontrolador que conta visitantes no estande do curso. Publica no broker MQTT por
+    WebSocket, em QoS 1, no tópico <code>dsm/prod/totem/sensor/contagem</code>. Ao fechar a aba, o broker publica a
+    mensagem de última vontade (<code>offline</code>) no tópico de status.</p>
+  </div>
+
+  <div class="card">
+    <h2>1. Conexão com o broker</h2>
+    <label>Endereço (WebSocket)<input id="url" value="ws://localhost:9001"></label>
+    <label>Usuário<input id="user" value="totem"></label>
+    <label>Senha<input id="pass" type="password" value="totem_pass"></label>
+    <button id="conectar">Conectar</button><button id="desconectar" disabled>Desconectar</button>
+    <p>Estado: <span id="estado" class="off">desconectado</span></p>
+  </div>
+
+  <div class="card">
+    <h2>2. Sensor de presença</h2>
+    <div>Visitantes contados: <span id="contador">0</span></div>
+    <button id="entrou" disabled>+1 visitante passou</button>
+    <button id="auto" disabled>Modo automático: desligado</button>
+    <button id="zerar" disabled>Zerar</button>
+  </div>
+
+  <div class="card">
+    <h2>Mensagens publicadas</h2>
+    <div id="log" role="log" aria-live="polite"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const SENSOR = "dsm/prod/totem/sensor/contagem";
+const STATUS = "dsm/prod/totem/status/sensor-web-01";
+let client = null, contagem = 0, timer = null;
+
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16);
+  });
+}
+function log(t) { const l = $("log"); l.textContent += new Date().toLocaleTimeString() + "  " + t + "\n"; l.scrollTop = l.scrollHeight; }
+function estado(txt, ok) { const e = $("estado"); e.textContent = txt; e.className = ok ? "on" : "off"; }
+function habilitar(on) {
+  $("conectar").disabled = on; $("desconectar").disabled = !on;
+  ["entrou", "auto", "zerar"].forEach((i) => ($(i).disabled = !on));
+}
+
+function publicar() {
+  if (!client || !client.connected) return;
+  const ev = {                                   // contrato da seção 6.3 do Documento de Visão
+    event_id: uuid(), session_id: "totem-sensor-web01", categoria: "sensor", origem: "totem",
+    ts: new Date().toISOString(), schema_version: 1, payload: { contagem: contagem, local: "estande" },
+  };
+  client.publish(SENSOR, JSON.stringify(ev), { qos: 1 }, (err) => log(err ? "ERRO: " + err.message : "publicado contagem=" + contagem));
+}
+
+$("conectar").onclick = () => {
+  estado("conectando...", false);
+  client = mqtt.connect($("url").value, {
+    username: $("user").value, password: $("pass").value, clientId: "dsm-totem-web-" + Math.random().toString(16).slice(2, 8),
+    reconnectPeriod: 2000, clean: true,
+    will: { topic: STATUS, payload: "offline", qos: 1, retain: true },   // mensagem de última vontade
+  });
+  client.on("connect", () => {
+    estado("conectado", true); habilitar(true); log("conectado ao broker");
+    client.publish(STATUS, "online", { qos: 1, retain: true });
+  });
+  client.on("reconnect", () => estado("reconectando...", false));
+  client.on("close", () => estado("desconectado", false));
+  client.on("error", (e) => log("erro: " + e.message));
+};
+$("desconectar").onclick = () => {
+  clearInterval(timer); timer = null; $("auto").textContent = "Modo automático: desligado";
+  if (client) client.end(); habilitar(false); estado("desconectado", false); log("desconectado");
+};
+$("entrou").onclick = () => { contagem++; $("contador").textContent = contagem; publicar(); };
+$("zerar").onclick = () => { contagem = 0; $("contador").textContent = 0; publicar(); };
+$("auto").onclick = () => {
+  if (timer) { clearInterval(timer); timer = null; $("auto").textContent = "Modo automático: desligado"; return; }
+  $("auto").textContent = "Modo automático: ligado (a cada 3 s)";
+  timer = setInterval(() => { contagem = Math.floor(Math.random() * 26); $("contador").textContent = contagem; publicar(); }, 3000);
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+.env
+__pycache__/
+.pytest_cache/
+.coverage
+.ruff_cache/
+*.pyc
+dist/
+web/
+app/build/
+app/.dart_tool/
+app/android/
+app/web/
+app/windows/
+app/linux/
+app/.metadata
+app/pubspec.lock
