@@ -108,7 +108,7 @@ class Telemetry extends ChangeNotifier {
     if (!consent || sessionId == null) return 'Ative o consentimento em Privacidade para registrar presença.';
     try {
       final p = await posicaoAtual();
-      return presenca(eventoId, lat: p.latitude, lon: p.longitude);
+      return await presenca(eventoId, lat: p.latitude, lon: p.longitude);
     } on LocalizacaoIndisponivel catch (e) {
       return e.toString();
     } catch (_) {

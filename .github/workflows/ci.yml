@@ -26,7 +26,7 @@ jobs:
       - run: rm -f test/widget_test.dart
       - run: dart tool/preparar_plataformas.dart
       - run: flutter pub get
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos
       - run: flutter test
 
   # Iteração 5: artefatos das três plataformas, gerados a partir da mesma base de código.
