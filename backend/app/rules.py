@@ -18,6 +18,11 @@ def dentro_do_raio(lat, lon, lat0, lon0, raio=RAIO_METROS) -> bool:
     return haversine_m(lat, lon, lat0, lon0) <= raio
 
 
+def _norm(codigo: str) -> str:
+    """Código do evento sem espaços nas pontas e sem diferença entre maiúsculas e minúsculas (RF10)."""
+    return codigo.strip().casefold()
+
+
 def _coord(v, minimo: float, maximo: float) -> float | None:
     try:
         f = float(v)
@@ -41,7 +46,7 @@ def presenca_valida(extra: dict, agora: datetime, codigo: str | None,
     tem_local = None not in local
 
     if codigo:  # presença por código / QR
-        if esperado and codigo != esperado:
+        if esperado and _norm(codigo) != _norm(esperado):
             return False, "código do evento inválido"
         return True, "ok"
 
