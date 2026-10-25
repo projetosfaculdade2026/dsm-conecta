@@ -22,7 +22,7 @@ broker, ingestão, persistência, API e app em pelo menos duas plataformas.
 |15|Artefatos web, Android e Windows|RNF01|5|Média|Nayara Eufrasio dos Santos|Feito|
 |16|Acessibilidade e design visual|RNF19|5|Média|Diulianne Carine Alves de Oliveira e Nayara Eufrasio dos Santos|Feito|
 |17|Painel público e dados abertos|RF25, RNF03, RN08|6|Média|Nayara Eufrasio dos Santos|Feito|
-|18|Ensaio de carga e relatório|RNF04–RNF06|6|Alta|Nayara Eufrasio dos Santos|Executar e registrar|
+|18|Ensaio de carga e relatório|RNF04–RNF06|6|Alta|Nayara Eufrasio dos Santos|Feito|
 |19|Ação de divulgação e devolutiva|Seção 9|6|Alta|Diulianne Carine Alves de Oliveira|Planejar|
 |20|Leitor de QR pela câmera|RF10|—|Baixa|—|Fora desta entrega|
 
